@@ -1,0 +1,8 @@
+streamlit
+tensorflow
+keras
+pillow
+numpy
+pandas
+h5py
+protobuf<4
