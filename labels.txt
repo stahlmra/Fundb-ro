@@ -1,0 +1,4 @@
+0 Hosen
+1 Schuhe
+2 Oberteile
+3 Mütze/Hut
