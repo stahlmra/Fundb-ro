@@ -15,7 +15,7 @@ st.title("🔍 Fundstück-Erkennung mit KI")
 # ==============================
 @st.cache_resource
 def load_teachable_model():
-    model = load_model("keras_Model.h5", compile=False)
+    model = load_model("keras_model.h5", compile=False)
     class_names = open("labels.txt", "r").readlines()
     return model, class_names
 
