@@ -9,8 +9,8 @@ from supabase import create_client, Client
 # ==============================
 # Supabase Verbindung
 # ==============================
-SUPABASE_URL = "https://lnbcyhrlnyxoyravabxl.supabase.co"
-SUPABASE_KEY = "sb_publishable_ihBm0N-affEABVJ20Jz5XQ_b2elhSvw"
+SUPABASE_URL = ""
+SUPABASE_KEY = ""
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
