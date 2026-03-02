@@ -4,7 +4,15 @@ import pandas as pd
 from keras.models import load_model
 from PIL import Image, ImageOps
 import datetime
-import os
+from supabase import create_client, Client
+
+# ==============================
+# Supabase Verbindung
+# ==============================
+SUPABASE_URL = "https://lnbcyhrlnyxoyravabxl.supabase.co"
+SUPABASE_KEY = "sb_publishable_ihBm0N-affEABVJ20Jz5XQ_b2elhSvw"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Fundstück-Erkennung", layout="centered")
 
@@ -22,13 +30,6 @@ def load_teachable_model():
 model, class_names = load_teachable_model()
 
 # ==============================
-# CSV-Datei vorbereiten
-# ==============================
-if not os.path.exists("funde.csv"):
-    df_init = pd.DataFrame(columns=["Datum", "Fundstück", "Confidence"])
-    df_init.to_csv("funde.csv", index=False)
-
-# ==============================
 # Bild hochladen
 # ==============================
 uploaded_file = st.file_uploader("📸 Lade ein Bild deines Fundstücks hoch", type=["jpg", "jpeg", "png"])
@@ -38,9 +39,6 @@ if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Hochgeladenes Bild", use_column_width=True)
 
-    # ==============================
-    # Bild vorbereiten
-    # ==============================
     size = (224, 224)
     image_resized = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
 
@@ -62,42 +60,47 @@ if uploaded_file is not None:
     st.write(f"📊 Sicherheit: {round(confidence_score * 100, 2)} %")
 
     # ==============================
-    # Speichern-Button
+    # Speichern in Supabase
     # ==============================
     if st.button("💾 Fundstück speichern"):
+
         new_entry = {
-            "Datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "Fundstück": class_name,
-            "Confidence": round(confidence_score * 100, 2)
+            "datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "fundstueck": class_name,
+            "confidence": round(confidence_score * 100, 2)
         }
 
-        df = pd.read_csv("funde.csv")
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-        df.to_csv("funde.csv", index=False)
+        response = supabase.table("funde").insert(new_entry).execute()
 
-        st.success("Fundstück gespeichert!")
+        if response.data:
+            st.success("✅ Fundstück erfolgreich in Supabase gespeichert!")
+        else:
+            st.error("❌ Fehler beim Speichern in Supabase.")
 
 # ==============================
-# Gefundene Fundstücke anzeigen
+# Gespeicherte Fundstücke anzeigen
 # ==============================
 st.divider()
-st.subheader("📂 Meine gespeicherten Fundstücke")
+st.subheader("📂 Meine gespeicherten Fundstücke (Supabase)")
 
-df = pd.read_csv("funde.csv")
+response = supabase.table("funde").select("*").order("datum", desc=True).execute()
 
-if not df.empty:
+if response.data:
+
+    df = pd.DataFrame(response.data)
     st.dataframe(df)
 
     st.subheader("🔎 Habe ich ein bestimmtes Fundstück gefunden?")
     suche = st.text_input("Fundstück eingeben")
 
     if suche:
-        treffer = df[df["Fundstück"].str.contains(suche, case=False)]
+        treffer = df[df["fundstueck"].str.contains(suche, case=False)]
 
         if not treffer.empty:
             st.success("✅ Ja! Dieses Fundstück wurde gefunden:")
             st.dataframe(treffer)
         else:
             st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
+
 else:
-    st.info("Noch keine Fundstücke gespeichert.")
+    st.info("Noch keine Fundstücke in Supabase gespeichert.")
