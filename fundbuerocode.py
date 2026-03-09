@@ -4,47 +4,34 @@ import pandas as pd
 from keras.models import load_model
 from PIL import Image, ImageOps
 import datetime
-import uuid
-from supabase import create_client
-
-# ==============================
-# Supabase Verbindung (ohne Keys im Code)
-# ==============================
-
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-BUCKET_NAME = st.secrets["BUCKET_NAME"]
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# ==============================
-# Streamlit Setup
-# ==============================
+import os
 
 st.set_page_config(page_title="Fundstück-Erkennung", layout="centered")
 
 st.title("🔍 Fundstück-Erkennung mit KI")
 
 # ==============================
-# Modell laden
+# Modell laden (nur einmal)
 # ==============================
-
 @st.cache_resource
 def load_teachable_model():
-    model = load_model("keras_model.h5", compile=False)
+    model = load_model("keras_Model.h5", compile=False)
     class_names = open("labels.txt", "r").readlines()
     return model, class_names
 
 model, class_names = load_teachable_model()
 
 # ==============================
+# CSV-Datei vorbereiten
+# ==============================
+if not os.path.exists("funde.csv"):
+    df_init = pd.DataFrame(columns=["Datum", "Fundstück", "Confidence"])
+    df_init.to_csv("funde.csv", index=False)
+
+# ==============================
 # Bild hochladen
 # ==============================
-
-uploaded_file = st.file_uploader(
-    "📸 Lade ein Bild deines Fundstücks hoch",
-    type=["jpg", "jpeg", "png"]
-)
+uploaded_file = st.file_uploader("📸 Lade ein Bild deines Fundstücks hoch", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
 
@@ -54,7 +41,6 @@ if uploaded_file is not None:
     # ==============================
     # Bild vorbereiten
     # ==============================
-
     size = (224, 224)
     image_resized = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
 
@@ -65,12 +51,10 @@ if uploaded_file is not None:
     data[0] = normalized_image_array
 
     # ==============================
-    # KI Vorhersage
+    # Vorhersage
     # ==============================
-
     prediction = model.predict(data)
     index = np.argmax(prediction)
-
     class_name = class_names[index].strip().split(" ", 1)[1]
     confidence_score = float(prediction[0][index])
 
@@ -78,87 +62,42 @@ if uploaded_file is not None:
     st.write(f"📊 Sicherheit: {round(confidence_score * 100, 2)} %")
 
     # ==============================
-    # Fundstück speichern
+    # Speichern-Button
     # ==============================
-
     if st.button("💾 Fundstück speichern"):
-
-        file_name = f"{uuid.uuid4()}.png"
-
-        # Upload zum Supabase Bucket
-        supabase.storage.from_(BUCKET_NAME).upload(
-            file_name,
-            uploaded_file.getvalue(),
-            {"content-type": "image/png"}
-        )
-
-        # Öffentliche URL
-        image_url = f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
-
         new_entry = {
-            "datum": datetime.datetime.now().isoformat(),
-            "fundstueck": class_name,
-            "confidence": round(confidence_score * 100, 2),
-            "bild_url": image_url
+            "Datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "Fundstück": class_name,
+            "Confidence": round(confidence_score * 100, 2)
         }
 
-        supabase.table("funde").insert(new_entry).execute()
+        df = pd.read_csv("funde.csv")
+        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
+        df.to_csv("funde.csv", index=False)
 
-        st.success("✅ Fundstück und Bild gespeichert!")
+        st.success("Fundstück gespeichert!")
 
 # ==============================
-# Gespeicherte Fundstücke anzeigen
+# Gefundene Fundstücke anzeigen
 # ==============================
-
 st.divider()
-st.subheader("📂 Gespeicherte Fundstücke")
+st.subheader("📂 Meine gespeicherten Fundstücke")
 
-response = supabase.table("funde").select("*").order("datum", desc=True).execute()
+df = pd.read_csv("funde.csv")
 
-if response.data:
+if not df.empty:
+    st.dataframe(df)
 
-    df = pd.DataFrame(response.data)
+    st.subheader("🔎 Habe ich ein bestimmtes Fundstück gefunden?")
+    suche = st.text_input("Fundstück eingeben")
 
-    for index, row in df.iterrows():
+    if suche:
+        treffer = df[df["Fundstück"].str.contains(suche, case=False)]
 
-        st.subheader(row["fundstueck"])
-        st.write(f"📊 Sicherheit: {row['confidence']} %")
-        st.write(f"📅 Datum: {row['datum']}")
-
-        if "bild_url" in row and row["bild_url"]:
-            st.image(row["bild_url"])
-
-        st.divider()
-
+        if not treffer.empty:
+            st.success("✅ Ja! Dieses Fundstück wurde gefunden:")
+            st.dataframe(treffer)
+        else:
+            st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
 else:
     st.info("Noch keine Fundstücke gespeichert.")
-
-# ==============================
-# Suche
-# ==============================
-
-st.subheader("🔎 Fundstück suchen")
-
-suche = st.text_input("Fundstück eingeben")
-
-if suche:
-
-    response = supabase.table("funde").select("*").ilike("fundstueck", f"%{suche}%").execute()
-
-    if response.data:
-
-        st.success("✅ Fundstücke gefunden")
-
-        for item in response.data:
-
-            st.write(item["fundstueck"])
-            st.write(item["datum"])
-            st.write(f"Sicherheit: {item['confidence']} %")
-
-            if item["bild_url"]:
-                st.image(item["bild_url"])
-
-            st.divider()
-
-    else:
-        st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
