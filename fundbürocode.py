@@ -8,11 +8,12 @@ import uuid
 from supabase import create_client
 
 # ==============================
-# Supabase Verbindung
+# Supabase Verbindung (ohne Keys im Code)
 # ==============================
 
-SUPABASE_URL = "https://lnbcyhrlnyxoyravabxl.supabase.co"
-SUPABASE_KEY = "sb_publishable_ihBm0N-affEABVJ20Jz5XQ_b2elhSvw"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+BUCKET_NAME = st.secrets["BUCKET_NAME"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -40,7 +41,10 @@ model, class_names = load_teachable_model()
 # Bild hochladen
 # ==============================
 
-uploaded_file = st.file_uploader("📸 Lade ein Bild deines Fundstücks hoch", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader(
+    "📸 Lade ein Bild deines Fundstücks hoch",
+    type=["jpg", "jpeg", "png"]
+)
 
 if uploaded_file is not None:
 
@@ -79,21 +83,20 @@ if uploaded_file is not None:
 
     if st.button("💾 Fundstück speichern"):
 
-        # eindeutiger Dateiname
         file_name = f"{uuid.uuid4()}.png"
 
-        # Bild in Supabase Bucket hochladen
-        supabase.storage.from_("fundbilder").upload(
+        # Upload zum Supabase Bucket
+        supabase.storage.from_(BUCKET_NAME).upload(
             file_name,
             uploaded_file.getvalue(),
             {"content-type": "image/png"}
         )
 
-        # Öffentliche Bild URL
-        image_url = f"{SUPABASE_URL}/storage/v1/object/public/fundbilder/{file_name}"
+        # Öffentliche URL
+        image_url = f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_name}"
 
         new_entry = {
-            "datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "datum": datetime.datetime.now().isoformat(),
             "fundstueck": class_name,
             "confidence": round(confidence_score * 100, 2),
             "bild_url": image_url
@@ -156,6 +159,9 @@ if suche:
                 st.image(item["bild_url"])
 
             st.divider()
+
+    else:
+        st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
 
     else:
         st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
