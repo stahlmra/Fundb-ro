@@ -162,6 +162,3 @@ if suche:
 
     else:
         st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
-
-    else:
-        st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
