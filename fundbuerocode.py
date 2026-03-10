@@ -44,7 +44,7 @@ uploaded_file = st.file_uploader("Wähle ein Bild aus...", type=["jpg", "jpeg", 
 if uploaded_file is not None:
     # Bild anzeigen
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption='Dein hochgeladenes Foto', use_container_width=True)
+    st.image(image, caption='Dein hochgeladenes Foto', use_column_width=True)
     
     st.write("---")
     st.write("### Analyse läuft...")
