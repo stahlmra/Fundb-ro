@@ -1,8 +1,4 @@
 streamlit
-tensorflow
-keras
+tensorflow-cpu
 pillow
 numpy
-pandas
-h5py
-protobuf<4
