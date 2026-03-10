@@ -1,103 +1,67 @@
 import streamlit as st
-import numpy as np
-import pandas as pd
 from keras.models import load_model
 from PIL import Image, ImageOps
-import datetime
-import os
+import numpy as np
 
-st.set_page_config(page_title="Fundstück-Erkennung", layout="centered")
+# --- KONFIGURATION ---
+st.set_page_config(page_title="Fundstück-Scanner", layout="centered")
 
-st.title("🔍 Fundstück-Erkennung mit KI")
-
-# ==============================
-# Modell laden (nur einmal)
-# ==============================
 @st.cache_resource
-def load_teachable_model():
-    model = load_model("keras_model.h5", compile=False)
-    class_names = open("labels.txt", "r").readlines()
-    return model, class_names
+def load_keras_model():
+    # Lädt das Modell nur einmal und speichert es im Cache
+    return load_model("keras_model.h5", compile=False)
 
-model, class_names = load_teachable_model()
-
-# ==============================
-# CSV-Datei vorbereiten
-# ==============================
-if not os.path.exists("funde.csv"):
-    df_init = pd.DataFrame(columns=["Datum", "Fundstück", "Confidence"])
-    df_init.to_csv("funde.csv", index=False)
-
-# ==============================
-# Bild hochladen
-# ==============================
-uploaded_file = st.file_uploader("📸 Lade ein Bild deines Fundstücks hoch", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
-
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Hochgeladenes Bild", use_column_width=True)
-
-    # ==============================
-    # Bild vorbereiten
-    # ==============================
+def predict(image_data, model, class_names):
+    # Vorbereitung des Bildes (224x224)
     size = (224, 224)
-    image_resized = ImageOps.fit(image, size, Image.Resampling.LANCZOS)
-
-    image_array = np.asarray(image_resized)
+    image = ImageOps.fit(image_data, size, Image.Resampling.LANCZOS)
+    
+    # Bild in Array umwandeln und normalisieren
+    image_array = np.asarray(image)
     normalized_image_array = (image_array.astype(np.float32) / 127.5) - 1
-
+    
+    # Daten für das Modell vorbereiten
     data = np.ndarray(shape=(1, 224, 224, 3), dtype=np.float32)
     data[0] = normalized_image_array
-
-    # ==============================
+    
     # Vorhersage
-    # ==============================
     prediction = model.predict(data)
     index = np.argmax(prediction)
-    class_name = class_names[index].strip().split(" ", 1)[1]
-    confidence_score = float(prediction[0][index])
+    return class_names[index], prediction[0][index]
 
-    st.success(f"🧠 Erkanntes Fundstück: **{class_name}**")
-    st.write(f"📊 Sicherheit: {round(confidence_score * 100, 2)} %")
+# --- UI DESIGN ---
+st.title("🔍 Fundstück-Erkennung")
+st.write("Lade ein Foto hoch, um zu sehen, ob es ein bekanntes Fundstück ist.")
 
-    # ==============================
-    # Speichern-Button
-    # ==============================
-    if st.button("💾 Fundstück speichern"):
-        new_entry = {
-            "Datum": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "Fundstück": class_name,
-            "Confidence": round(confidence_score * 100, 2)
-        }
+# Modell und Labels laden
+model = load_keras_model()
+with open("labels.txt", "r") as f:
+    class_names = [line.strip() for line in f.readlines()]
 
-        df = pd.read_csv("funde.csv")
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-        df.to_csv("funde.csv", index=False)
+# Datei-Upload
+uploaded_file = st.file_uploader("Wähle ein Bild aus...", type=["jpg", "jpeg", "png"])
 
-        st.success("Fundstück gespeichert!")
+if uploaded_file is not None:
+    # Bild anzeigen
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption='Dein hochgeladenes Foto', use_container_width=True)
+    
+    st.write("---")
+    st.write("### Analyse läuft...")
+    
+    # Vorhersage treffen
+    label, score = predict(image, model, class_names)
+    
+    # Ergebnis anzeigen
+    # Wir entfernen die ersten zwei Zeichen (z.B. "0 "), falls vorhanden
+    clean_label = label[2:] if label[0].isdigit() else label
+    
+    if score > 0.7:  # Schwellenwert für Sicherheit (70%)
+        st.success(f"**Gefunden!** Das ist ein: **{clean_label}**")
+        st.info(f"Sicherheit der KI: {score:.2%}")
+    else:
+        st.warning("Das Fundstück konnte nicht eindeutig identifiziert werden.")
+        st.write(f"Vermutung: {clean_label} ({score:.2%})")
 
-# ==============================
-# Gefundene Fundstücke anzeigen
-# ==============================
-st.divider()
-st.subheader("📂 Meine gespeicherten Fundstücke")
-
-df = pd.read_csv("funde.csv")
-
-if not df.empty:
-    st.dataframe(df)
-
-    st.subheader("🔎 Habe ich ein bestimmtes Fundstück gefunden?")
-    suche = st.text_input("Fundstück eingeben")
-
-    if suche:
-        treffer = df[df["Fundstück"].str.contains(suche, case=False)]
-
-        if not treffer.empty:
-            st.success("✅ Ja! Dieses Fundstück wurde gefunden:")
-            st.dataframe(treffer)
-        else:
-            st.error("❌ Dieses Fundstück wurde noch nicht gefunden.")
-else:
-    st.info("Noch keine Fundstücke gespeichert.")
+# --- HINWEIS ---
+st.sidebar.info("Stelle sicher, dass 'keras_model.h5' und 'labels.txt' im selben Ordner liegen.")
