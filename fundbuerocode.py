@@ -9,8 +9,8 @@ import io
 
 # --- SUPABASE SETUP ---
 # Ersetze diese Werte mit deinen echten Daten aus Supabase (Settings -> API)
-SUPABASE_URL = "DEINE_SUPABASE_URL"
-SUPABASE_KEY = "DEIN_SUPABASE_ANON_KEY"
+SUPABASE_URL = "https://zvrhcoarljnfpkrnpyzm.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2cmhjb2FybGpuZnBrcm5weXptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNDk3MDQsImV4cCI6MjA4ODcyNTcwNH0.98iJ11gECYLelxFyiqrhOl_t9kxLGZTuaykhWxYg8_g"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- KONFIGURATION ---
