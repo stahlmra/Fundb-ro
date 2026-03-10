@@ -43,7 +43,7 @@ uploaded_file = st.file_uploader("Wähle ein Bild aus...", type=["jpg", "jpeg", 
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption='Hochgeladenes Foto', use_container_width=True)
+    st.image(image, caption='Hochgeladenes Foto', use_column_width=True)
     
     # KI-ANALYSE
     st.subheader("1. KI-Analyse")
